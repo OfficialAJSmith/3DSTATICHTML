@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D Cube Navigation</title>
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- Font Awesome for icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+    <style>
+      /* Custom Styles */
+      body {
+        --default-bg: #f0f2f5;
+        font-family: "Inter", sans-serif;
+        background-color: var(--default-bg);
+        color: #333;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        /* Removed overflow: hidden for accessibility */
+        transition: background-color 0.8s;
+      }
+
+      .scene {
+        width: 300px;
+        height: 300px;
+        perspective: 1000px;
+        margin: 40px 0;
+        transition: opacity 0.5s ease;
+        overflow: hidden; /* Prevents scrollbars during rotation */
+      }
+
+      .scene {
+        width: 300px;
+        height: 300px;
+        perspective: 1000px;
+        margin: 40px 0;
+        transition: opacity 0.5s ease;
+      }
+
+      .cube {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        transform-style: preserve-3d;
+        transition: transform 1.2s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+      }
+
+      .cube__face {
+        position: absolute;
+        width: 300px;
+        height: 300px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+        box-sizing: border-box;
+        border: 2px solid #fff;
+        overflow: hidden; /* Hide overflowing content on all cube faces in default state */
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        border-radius: 10px;
+        color: #333;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+        overflow: hidden; /* Hide overflowing content on the small cube */
+      }
+
+      .cube__face h2 {
+        font-size: 1.5rem;
+        margin-bottom: 10px;
+        font-weight: 700;
+      }
+
+      .cube__face p {
+        font-size: 0.9rem;
+      }
+
+      .full-content {
+        display: none; /* Hide extended content by default */
+      }
+
+      /* Position each face of the cube in 3D space */
+      .cube__face--front {
+        transform: rotateY(0deg) translateZ(150px);
+        background-color: #e0f7fa;
+      }
+      .cube__face--right {
+        transform: rotateY(90deg) translateZ(150px);
+        background-color: #ffecb3;
+      }
+      .cube__face--back {
+        transform: rotateY(180deg) translateZ(150px);
+        background-color: #c8e6c9;
+      }
+      .cube__face--left {
+        transform: rotateY(-90deg) translateZ(150px);
+        background-color: #ffcdd2;
+      }
+      .cube__face--top {
+        transform: rotateX(90deg) translateZ(150px);
+        background-color: #d1c4e9;
+      }
+      .cube__face--bottom {
+        transform: rotateX(-90deg) translateZ(150px);
+        background-color: #f0f4c3;
+      }
+
+      .navigation-controls {
+        margin-top: 20px;
+        display: grid;
+        grid-template-areas:
+          ". up ."
+          "left . right"
+          ". down .";
+        gap: 10px;
+      }
+
+      .btn-nav {
+        width: 60px;
+        height: 60px;
+        font-size: 1.5rem;
+        border-radius: 50%;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      }
+
+      #nav-up {
+        grid-area: up;
+      }
+      #nav-down {
+        grid-area: down;
+      }
+      #nav-left {
+        grid-area: left;
+      }
+      #nav-right {
+        grid-area: right;
+      }
+
+      /* Styles for zoomed-in face */
+      .cube__face.is-zoomed {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 100;
+        transform: none !important; /* Override 3D transforms */
+        border-radius: 0;
+        justify-content: flex-start; /* Align content to the top */
+        align-items: flex-start;
+        text-align: left;
+        padding: 5rem 2rem 2rem; /* More padding for content */
+        overflow-y: auto; /* Enable scroll on mobile */
+        cursor: default !important; /* Remove pointer cursor when zoomed */
+      }
+
+      .cube__face.is-zoomed .summary {
+        font-style: italic;
+        color: #555;
+        margin-bottom: 2rem;
+      }
+
+      .cube__face.is-zoomed .full-content {
+        display: block; /* Show when face is zoomed */
+      }
+
+      .cube__face.is-zoomed h2 {
+        font-size: 2.5rem;
+      }
+
+      .cube__face.is-zoomed p {
+        font-size: 1.1rem;
+        max-width: 800px;
+      }
+
+      .btn-close-zoom {
+        position: fixed;
+        top: 20px;
+        right: 30px;
+        font-size: 3rem;
+        color: #333;
+        background: none;
+        border: none;
+        cursor: pointer;
+        z-index: 110;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.5s 0.5s; /* Delay appearance */
+      }
+
+      body.is-zoomed .btn-close-zoom {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      body.is-zoomed .scene,
+      body.is-zoomed .hide-on-zoom {
+        opacity: 0;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body class="container text-center">
+    <header class="my-4 hide-on-zoom">
+      <h1 class="display-4 fw-bold">3D Cube Navigation</h1>
+      <p class="lead">Click a face of the cube to expand it.</p>
+    </header>
+
+    <!-- 3D Scene Container: Main interactive 3D navigation area for accessibility -->
+    <div class="scene" role="region" aria-label="3D Scene">
+      <div class="cube" id="cube">
+        <!-- Front Face -->
+        <div class="cube__face cube__face--front">
+          <h2>Home</h2>
+          <p class="summary">
+            Welcome to our interactive 3D website. This is the starting face of the cube.
+          </p>
+          <div class="full-content">
+            <img
+              src="https://placehold.co/800x400/e0f7fa/333?text=Welcome"
+              alt="Welcome Placeholder"
+              class="img-fluid rounded my-3"
+              loading="lazy"
+            />
+            <p>
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam in
+              dui mauris. Vivamus hendrerit arcu sed erat molestie vehicula. Sed
+              auctor neque eu tellus rhoncus ut eleifend nibh porttitor. Ut in
+              nulla enim. Phasellus molestie magna non est bibendum non
+              venenatis nisl tempor. Suspendisse dictum feugiat nisl ut dapibus.
+            </p>
+            <p>
+              Mauris iaculis porttitor posuere. Praesent id metus massa, ut
+              blandit odio. Proin quis tortor orci. Etiam at risus et justo
+              dignissim congue. Donec congue lacinia dui, a porttitor lectus
+              condimentum laoreet. Nunc eu ullamcorper orci. Quisque eget odio
+              ac lectus vestibulum faucibus eget in metus. In pellentesque
+              faucibus vestibulum.
+            </p>
+          </div>
+        </div>
+
+        <!-- Back Face -->
+        <div class="cube__face cube__face--back">
+          <h2>Contact</h2>
+          <p class="summary">
+            You can reach us via email at contact@example.com or by phone.
+          </p>
+          <div class="full-content">
+            <img
+              src="https://placehold.co/800x400/c8e6c9/333?text=Get+In+Touch"
+              alt="Contact Placeholder"
+              class="img-fluid rounded my-3"
+              loading="lazy"
+            />
+            <p>
+              nisl, porta vel, scelerisque eget, malesuada at, neque. Vivamus
+              eget nibh. Etiam cursus leo vel metus. Nulla facilisi. Aenean nec
+              eros. Vestibulum ante ipsum primis in faucibus orci luctus et
+              ultrices posuere cubilia Curae; Suspendisse sollicitudin velit sed
+              leo.
+            </p>
+            <p>
+              Ut pharetra augue nec augue. Nam elit agna, endrerit sit amet,
+              tincidunt ac, viverra sed, nulla. Donec porta diam eu massa.
+              Quisque diam lorem, interdum vitae, dapibus ac, scelerisque vitae,
+              pede. Donec eget tellus non erat lacinia fermentum. Donec in velit
+              vel ipsum auctor pulvinar.
+            </p>
+          </div>
+        </div>
+
+        <!-- Right Face -->
+        <div class="cube__face cube__face--right">
+          <h2>About</h2>
+          <p class="summary">
+            We are a creative team passionate about building innovative web
+            experiences.
+          </p>
+          <div class="full-content">
+            <img
+              src="https://placehold.co/800x400/ffecb3/333?text=Our+Story"
+              alt="About Us Placeholder"
+              class="img-fluid rounded my-3"
+              loading="lazy"
+            />
+            <p>
+              convallis. Morbi odio odio, elementum eu, interdum eu, tincidunt
+              in, leo. Maecenas pulvinar lobortis est. Phasellus sit amet erat.
+              Nulla tempus. Vivamus in felis eu sapien cursus vestibulum.
+            </p>
+            <p>
+              scelerisque, quam turpis adipiscing lorem, vitae mattis nibh
+              ligula nec sem. Duis aliquam convallis nunc. Proin at turpis a
+              pede posuere nonummy. Integer non velit. Donec diam neque, varius
+              eget, consectetuer id, imperdiet sit amet, quam.
+            </p>
+          </div>
+        </div>
+
+        <!-- Left Face -->
+        <div class="cube__face cube__face--left">
+          <h2>Services</h2>
+          <p class="summary">
+            We offer a range of services to help your business grow.
+          </p>
+          <div class="full-content">
+            <img
+              src="https://placehold.co/800x400/ffcdd2/333?text=What+We+Do"
+              alt="Services Placeholder"
+              class="img-fluid rounded my-3"
+              loading="lazy"
+            />
+            <img
+              src="https://placehold.co/800x400/ffcdd2/333?text=What+We+Do"
+              alt="Services Placeholder"
+              class="img-fluid rounded my-3"
+              loading="lazy"
+            />
+            <img
+              src="https://placehold.co/800x400/ffcdd2/333?text=What+We+Do"
+              alt="Services Placeholder"
+              class="img-fluid rounded my-3"
+              loading="lazy"
+            />
+            <p>
+              amet quam egestas semper. Aenean ultricies mi vitae est. Mauris
+              placerat eleifend leo. Quisque sit amet est et sapien ullamcorper
+              pharetra.
+            </p>
+            <p>
+              eros ipsum rutrum orci, sagittis tempus lacus enim ac dui. Donec
+              non enim in turpis pulvinar facilisis. Ut felis. Praesent dapibus,
+              neque id cursus faucibus, tortor neque egestas augue, eu vulputate
+              magna eros eu erat.
+            </p>
+          </div>
+        </div>
+
+        <!-- Top Face -->
+        <div class="cube__face cube__face--top">
+          <h2>Portfolio</h2>
+          <p class="summary">
+            Check out our latest projects and works.
+          </p>
+          <div class="full-content">
+            <img
+              src="https://placehold.co/800x400/d1c4e9/333?text=Our+Work"
+              alt="Portfolio Placeholder"
+              class="img-fluid rounded my-3"
+              loading="lazy"
+            />
+            <img
+              src="https://placehold.co/800x400/d1c4e9/333?text=Our+Work"
+              alt="Portfolio Placeholder"
+              class="img-fluid rounded my-3"
+              loading="lazy"
+            />
+            <img
+              src="https://placehold.co/800x400/d1c4e9/333?text=Our+Work"
+              alt="Portfolio Placeholder"
+              class="img-fluid rounded my-3"
+              loading="lazy"
+            />
+            <p>
+              vehicula venenatis, tincidunt ac, pede. Nulla aliquam vulputate
+              eleifend.
+            </p>
+          </div>
+        </div>
+
+        <!-- Bottom Face -->
+        <div class="cube__face cube__face--bottom">
+          <h2>Blog</h2>
+          <p class="summary">
+            Stay updated with our latest news and insights.
+          </p>
+          <div class="full-content">
+            <img
+              src="https://placehold.co/800x400/f0f4c3/333?text=Latest+News"
+              alt="Blog Placeholder"
+              class="img-fluid rounded my-3"
+              loading="lazy"
+            />
+            <img
+              src="https://placehold.co/800x400/f0f4c3/333?text=Latest+News"
+              alt="Blog Placeholder"
+              class="img-fluid rounded my-3"
+              loading="lazy"
+            />
+            <p>
+              fermentum, sem in pharetra pellentesque, velit turpis volutpat
+              ante, in pharetra metus odio a lectus.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation Buttons -->
+    <div class="navigation-controls">
+      <button id="nav-up" class="btn btn-primary btn-nav">
+        <i class="fas fa-arrow-up"></i>
+      </button>
+      <button id="nav-down" class="btn btn-primary btn-nav">
+        <i class="fas fa-arrow-down"></i>
+      </button>
+      <button id="nav-left" class="btn btn-primary btn-nav">
+        <i class="fas fa-arrow-left"></i>
+      </button>
+      <button id="nav-right" class="btn btn-primary btn-nav">
+        <i class="fas fa-arrow-right"></i>
+      </button>
+    </div>
+
+    <footer class="mt-5 text-muted hide-on-zoom">
+      <p>Built with Bootstrap & Vanilla JavaScript.</p>
+    </footer>
+    <script>
+      /**
+       * 3D Cube Navigation Script
+       * Handles interactive 3D cube rotation, face zoom/expand, keyboard navigation,
+        const cubeFaces = document.querySelectorAll(".cube__face");
+       */
+      document.addEventListener("DOMContentLoaded", () => {
+        const cube = document.getElementById("cube");
+        const faces = document.querySelectorAll(".cube__face");
+        const faces = document.querySelectorAll(".cube__face");
+        const body = document.body;
+        let rotateX = 0;
+        let rotateY = 0;
+        let zoomedFace = null;
+
+        // Function to apply the rotation to the cube
+        const applyRotation = () => {
+          if (body.classList.contains("is-zoomed")) return;
+          cube.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+        };
+
+        // Event listeners for navigation buttons
+        document.getElementById("nav-up").addEventListener("click", () => {
+          rotateX -= 90;
+          applyRotation();
+        });
+
+        document.getElementById("nav-down").addEventListener("click", () => {
+          rotateX += 90;
+          applyRotation();
+        });
+
+        document.getElementById("nav-left").addEventListener("click", () => {
+          rotateY -= 90;
+          applyRotation();
+        });
+
+        document.getElementById("nav-right").addEventListener("click", () => {
+          rotateY += 90;
+          applyRotation();
+        });
+
+        // --- Zoom Functionality ---
+
+        // Create a single close button to be used by all faces
+        const closeButton = document.createElement("button");
+        closeButton.innerHTML = "&times;";
+        closeButton.className = "btn-close-zoom";
+        body.appendChild(closeButton);
+
+        const unzoom = () => {
+          if (!zoomedFace) return;
+          body.classList.remove("is-zoomed");
+          // Use the CSS variable for the default background color
+          body.style.backgroundColor = getComputedStyle(body).getPropertyValue('--default-bg').trim();
+          zoomedFace.classList.remove("is-zoomed");
+          zoomedFace = null;
+        };
+
+        // Allow arrow keys for navigation
+        window.addEventListener("keydown", (e) => {
+          if (body.classList.contains("is-zoomed")) {
+            if (e.key === "Escape") unzoom();
+            return;
+          }
+          switch (e.key) {
+            case "ArrowUp":
+              rotateX -= 90;
+              break;
+            case "ArrowDown":
+              rotateX += 90;
+              break;
+            case "ArrowLeft":
+              rotateY -= 90;
+              break;
+            case "ArrowRight":
+              rotateY += 90;
+              break;
+          }
+        cubeFaces.forEach((face) => {
+          face.addEventListener("click", (e) => {
+            if (body.classList.contains("is-zoomed")) return;
+
+            zoomedFace = e.currentTarget;
+            zoomedFace.classList.add("is-zoomed");
+            body.classList.add("is-zoomed");
+
+            // Use the background color of the face for the body transition
+            const faceColor =
+              window.getComputedStyle(zoomedFace).backgroundColor;
+            body.style.backgroundColor = faceColor;
+          });
+        });
+            const faceColor =
+              window.getComputedStyle(zoomedFace).backgroundColor;
+            body.style.backgroundColor = faceColor;
+          });
+        });
+      });
+    </script>
+  </body>
+</html>
